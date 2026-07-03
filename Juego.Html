@@ -6,8 +6,9 @@
     <title>Sausage Jump - Juego</title>
     <style>
         body { margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: #1a1a2e; overflow: hidden; font-family: 'Arial Black', sans-serif; }
+        /* Mantenemos el tamaño del contenedor, pero los objetos internos rellenarán mejor el espacio */
         #gameContainer { position: relative; width: 400px; height: 600px; }
-        canvas { background: #a2d2ff; border-radius: 10px; display: block; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        canvas { background: #a2d2ff; border-radius: 10px; display: block; box-shadow: 0 0 20px rgba(0,0,0,0.5); image-rendering: pixelated; }
         #score { position: absolute; top: 20px; width: 100%; text-align: center; font-size: 50px; color: white; text-shadow: 3px 3px black; pointer-events: none; z-index: 5; }
         
         #powerUpIndicator {
@@ -89,7 +90,6 @@
         const sndGameOver = new Audio('perder.mp3');
         const sndPowerUp = new Audio('Imagenes/moneda.mp3');
 
-        // Control de efectos de sonido especiales
         function playSound(audio) {
             if (soundEnabled) {
                 audio.currentTime = 0;
@@ -97,7 +97,6 @@
             }
         }
 
-        // Control de música de fondo activa
         function startMusicGame() {
             if (musicEnabled && bgMusicGame.paused) {
                 bgMusicGame.play().catch(e => console.log("Esperando clic para iniciar música de fondo."));
@@ -124,7 +123,7 @@
             return img;
         });
 
-        // --- VARIABLES DEL JUEGO ---
+        // --- VARIABLES DEL JUEGO (NUEVAS ESCALAS MÁS GRANDES) ---
         let score = 0;
         let gameState = "playing";
         let player, stack, incomingBlock, deadPlayer, cameraY;
@@ -148,11 +147,12 @@
             powerUpIndicator.innerText = "";
             if(powerUpTimerInterval) clearInterval(powerUpTimerInterval);
             
-            player = { x: 175, y: 450, w: 50, h: 60, dy: 0, onGround: true, currentPlatformY: 520, rotation: 0 };
-            stack = [{ x: 140, y: 520, w: 120, h: 40, img: blockImages[0], powerUp: null }];
+            // Personaje escalado de (50x60) a (75x90)
+            player = { x: 162.5, y: 390, w: 75, h: 90, dy: 0, onGround: true, currentPlatformY: 480, rotation: 0 };
+            // Bloques escalados de (120x40) a (180x60)
+            stack = [{ x: 110, y: 480, w: 180, h: 60, img: blockImages[0], powerUp: null }];
             resetIncoming();
 
-            // Si se le da a reintentar, intentamos reanudar la música
             startMusicGame();
         }
 
@@ -167,11 +167,12 @@
 
             let calculatedSpeed = 3.0 + (score * 0.08); 
             
+            // Bloque entrante con las nuevas dimensiones escaladas (180x60)
             incomingBlock = {
                 side: side,
-                w: 120, h: 40,
-                x: (side === 'left' ? -120 : 400),
-                y: stack[stack.length - 1].y - 40,
+                w: 180, h: 60,
+                x: (side === 'left' ? -180 : 400),
+                y: stack[stack.length - 1].y - 60,
                 speed: calculatedSpeed * (side === 'left' ? 1 : -1),
                 img: randomSkin,
                 powerUp: blockPowerType 
@@ -233,12 +234,14 @@
                 }
 
                 incomingBlock.x += incomingBlock.speed;
-                const centerLimit = canvas.width / 2 - 60;
+                // Ajustado el límite al centro exacto considerando el nuevo ancho de 180 (400 / 2 - 180 / 2 = 110)
+                const centerLimit = 110;
                 const blockReached = (incomingBlock.side === 'left' && incomingBlock.x >= centerLimit) ||
                                      (incomingBlock.side === 'right' && incomingBlock.x <= centerLimit);
 
                 if (blockReached) {
-                    if (player.y + player.h <= incomingBlock.y + 20) {
+                    // Tolerancia de colisión superior ajustada proporcionalmente
+                    if (player.y + player.h <= incomingBlock.y + 30) {
                         incomingBlock.x = centerLimit;
                         stack.push({...incomingBlock});
                         player.currentPlatformY = incomingBlock.y;
@@ -258,7 +261,8 @@
                     }
                 }
 
-                if (player.onGround && player.x < incomingBlock.x + 120 && player.x + 50 > incomingBlock.x && player.y + 60 > incomingBlock.y) {
+                // Ajuste de colisiones laterales con el bloque en movimiento con los nuevos tamaños
+                if (player.onGround && player.x < incomingBlock.x + 180 && player.x + player.w > incomingBlock.x && player.y + player.h > incomingBlock.y) {
                     handlePlayerDeath();
                 }
 
@@ -279,17 +283,13 @@
 
         function startDeath() {
             gameState = "falling";
-            
-            // Pausamos la música de fondo al perder para drama
             bgMusicGame.pause();
             playSound(sndGameOver);
-            
             deadPlayer = { x: player.x, y: player.y, vx: (incomingBlock.side === 'left' ? 5 : -5), vy: -12, rotation: 0 };
         }
 
         function showMenu() {
             gameState = "gameOver";
-            
             let savedCoins = parseInt(localStorage.getItem('gameCoins')) || 0;
             savedCoins += score; 
             localStorage.setItem('gameCoins', savedCoins);
@@ -302,6 +302,13 @@
 
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // --- EL TRUCO ANTIBLUR: Desactiva el suavizado nativo en cada renderizado ---
+            ctx.imageSmoothingEnabled = false;
+            ctx.mozImageSmoothingEnabled = false;
+            ctx.webkitImageSmoothingEnabled = false;
+            ctx.msImageSmoothingEnabled = false;
+
             ctx.save();
             ctx.translate(0, cameraY);
 
@@ -313,8 +320,8 @@
                 ctx.drawImage(incomingBlock.img, incomingBlock.x, incomingBlock.y, incomingBlock.w, incomingBlock.h);
                 
                 if (incomingBlock.powerUp) {
-                    let powerW = 30;
-                    let powerH = 30;
+                    let powerW = 40; // Íconos ligeramente más grandes también
+                    let powerH = 40;
                     let powerX = incomingBlock.x + (incomingBlock.w / 2) - (powerW / 2);
                     let powerY = incomingBlock.y - powerH - 5; 
 
@@ -336,9 +343,9 @@
 
             if (gameState === "falling") {
                 ctx.save();
-                ctx.translate(deadPlayer.x + 25, deadPlayer.y + 30);
+                ctx.translate(deadPlayer.x + (player.w / 2), deadPlayer.y + (player.h / 2));
                 ctx.rotate(deadPlayer.rotation);
-                ctx.drawImage(imgPlayer, -25, -30, 50, 60);
+                ctx.drawImage(imgPlayer, -(player.w / 2), -(player.h / 2), player.w, player.h);
                 ctx.restore();
             }
 
@@ -349,9 +356,8 @@
 
         retryBtn.addEventListener('click', initGame);
         
-        // Detectar interacción táctil o mouse para el salto y activar música
         window.addEventListener('mousedown', () => {
-            startMusicGame(); // Activa la música al primer toque del usuario
+            startMusicGame(); 
             if (gameState === "playing" && player.onGround) {
                 player.dy = jumpForce;
                 player.onGround = false;
