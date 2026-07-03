@@ -3,12 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sausage Jump - Juego</title>
+    <title>Sausage Jump - Juego (Alta Resolución)</title>
     <style>
         body { margin: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background: #1a1a2e; overflow: hidden; font-family: 'Arial Black', sans-serif; }
-        /* Mantenemos el tamaño del contenedor, pero los objetos internos rellenarán mejor el espacio */
+        
+        /* El contenedor mide 400x600 en la pantalla del celular */
         #gameContainer { position: relative; width: 400px; height: 600px; }
-        canvas { background: #a2d2ff; border-radius: 10px; display: block; box-shadow: 0 0 20px rgba(0,0,0,0.5); image-rendering: pixelated; }
+        
+        /* El canvas se adapta visualmente al contenedor, pero internamente tiene el doble de resolución */
+        canvas { 
+            width: 100%; 
+            height: 100%; 
+            background: #a2d2ff; 
+            border-radius: 10px; 
+            display: block; 
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            /* Forzar bordes limpios en CSS */
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        
         #score { position: absolute; top: 20px; width: 100%; text-align: center; font-size: 50px; color: white; text-shadow: 3px 3px black; pointer-events: none; z-index: 5; }
         
         #powerUpIndicator {
@@ -24,7 +38,6 @@
             font-weight: bold;
         }
 
-        /* Menú de Derrota */
         #gameOverMenu {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -77,14 +90,13 @@
         const finalCoinsText = document.getElementById('finalCoinsText');
         const retryBtn = document.getElementById('retryBtn');
 
-        canvas.width = 400;
-        canvas.height = 600;
+        // RESOLUCIÓN INTERNA DUPLICADA (Garantiza nitidez HD en móviles)
+        canvas.width = 800;
+        canvas.height = 1200;
 
-        // --- COMPROBACIÓN DE AJUSTES ENLAZADOS CON EL MENÚ ---
         let musicEnabled = localStorage.getItem('musicEnabled') !== 'false';
         let soundEnabled = localStorage.getItem('soundEnabled') !== 'false';
 
-        // --- MÚSICA Y EFECTOS DE SONIDO ---
         const bgMusicGame = document.getElementById('bgMusicGame');
         const sndJump = new Audio('salto.mp3');
         const sndGameOver = new Audio('perder.mp3');
@@ -93,29 +105,26 @@
         function playSound(audio) {
             if (soundEnabled) {
                 audio.currentTime = 0;
-                audio.play().catch(e => console.log("Audio bloqueado temporalmente por el navegador."));
+                audio.play().catch(e => console.log("Audio bloqueado."));
             }
         }
 
         function startMusicGame() {
             if (musicEnabled && bgMusicGame.paused) {
-                bgMusicGame.play().catch(e => console.log("Esperando clic para iniciar música de fondo."));
+                bgMusicGame.play().catch(e => console.log("Esperando interacción..."));
             }
         }
 
-        // --- SISTEMA DE SKINS JUGADOR ---
         const selectedSkin = localStorage.getItem('userSkin') || 'Lucha.png';
         const imgPlayer = new Image();
         imgPlayer.src = selectedSkin; 
 
-        // --- IMÁGENES DE LOS PODERES ---
         const imgShield = new Image();
         imgShield.src = 'Imagenes/Proteccion.png'; 
 
         const imgDouble = new Image();
         imgDouble.src = 'Imagenes/Soda x2.png'; 
 
-        // Bloques Aleatorios
         const blockSkinsSrc = ['Imagenes/Zanhoria.png', 'Imagenes/Madera.png', 'Imagenes/pierna de pollo.png', 'Imagenes/Paleta de Choco.png', 'Imagenes/pepino.png'];
         const blockImages = blockSkinsSrc.map(src => {
             const img = new Image();
@@ -123,14 +132,14 @@
             return img;
         });
 
-        // --- VARIABLES DEL JUEGO (NUEVAS ESCALAS MÁS GRANDES) ---
         let score = 0;
         let gameState = "playing";
         let player, stack, incomingBlock, deadPlayer, cameraY;
-        const gravity = 0.6;
-        const jumpForce = -12;
+        
+        // Físicas adaptadas a la nueva altura interna de 1200px
+        const gravity = 1.2;
+        const jumpForce = -24;
 
-        // --- VARIABLES DE PODERES ---
         let activePowerUp = null; 
         let powerUpTimeLeft = 0;
         let powerUpTimerInterval = null;
@@ -147,10 +156,11 @@
             powerUpIndicator.innerText = "";
             if(powerUpTimerInterval) clearInterval(powerUpTimerInterval);
             
-            // Personaje escalado de (50x60) a (75x90)
-            player = { x: 162.5, y: 390, w: 75, h: 90, dy: 0, onGround: true, currentPlatformY: 480, rotation: 0 };
-            // Bloques escalados de (120x40) a (180x60)
-            stack = [{ x: 110, y: 480, w: 180, h: 60, img: blockImages[0], powerUp: null }];
+            // PERSONAJE GIGANTE: Ahora mide 130x160 (Antes era 50x60)
+            player = { x: 335, y: 840, w: 130, h: 160, dy: 0, onGround: true, currentPlatformY: 1000, rotation: 0 };
+            
+            // BLOQUES GIGANTES: Ahora miden 320x100 (Antes eran 120x40)
+            stack = [{ x: 240, y: 1000, w: 320, h: 100, img: blockImages[0], powerUp: null }];
             resetIncoming();
 
             startMusicGame();
@@ -165,14 +175,14 @@
                 blockPowerType = Math.random() > 0.5 ? 'shield' : 'doublePoints';
             }
 
-            let calculatedSpeed = 3.0 + (score * 0.08); 
+            // Velocidad adaptada al espacio duplicado
+            let calculatedSpeed = 6.0 + (score * 0.16); 
             
-            // Bloque entrante con las nuevas dimensiones escaladas (180x60)
             incomingBlock = {
                 side: side,
-                w: 180, h: 60,
-                x: (side === 'left' ? -180 : 400),
-                y: stack[stack.length - 1].y - 60,
+                w: 320, h: 100,
+                x: (side === 'left' ? -320 : 800),
+                y: stack[stack.length - 1].y - 100,
                 speed: calculatedSpeed * (side === 'left' ? 1 : -1),
                 img: randomSkin,
                 powerUp: blockPowerType 
@@ -234,14 +244,14 @@
                 }
 
                 incomingBlock.x += incomingBlock.speed;
-                // Ajustado el límite al centro exacto considerando el nuevo ancho de 180 (400 / 2 - 180 / 2 = 110)
-                const centerLimit = 110;
+                
+                // Centrado exacto del bloque en la nueva resolución (800 / 2 - 320 / 2 = 240)
+                const centerLimit = 240;
                 const blockReached = (incomingBlock.side === 'left' && incomingBlock.x >= centerLimit) ||
                                      (incomingBlock.side === 'right' && incomingBlock.x <= centerLimit);
 
                 if (blockReached) {
-                    // Tolerancia de colisión superior ajustada proporcionalmente
-                    if (player.y + player.h <= incomingBlock.y + 30) {
+                    if (player.y + player.h <= incomingBlock.y + 40) {
                         incomingBlock.x = centerLimit;
                         stack.push({...incomingBlock});
                         player.currentPlatformY = incomingBlock.y;
@@ -261,21 +271,21 @@
                     }
                 }
 
-                // Ajuste de colisiones laterales con el bloque en movimiento con los nuevos tamaños
-                if (player.onGround && player.x < incomingBlock.x + 180 && player.x + player.w > incomingBlock.x && player.y + player.h > incomingBlock.y) {
+                // Colisiones calibradas para los tamaños gigantes
+                if (player.onGround && player.x < incomingBlock.x + 320 && player.x + player.w > incomingBlock.x && player.y + player.h > incomingBlock.y) {
                     handlePlayerDeath();
                 }
 
-                let targetCam = 300 - player.y;
+                let targetCam = 600 - player.y;
                 if (targetCam > cameraY) cameraY += (targetCam - cameraY) * 0.1;
             }
 
             if (gameState === "falling") {
                 deadPlayer.x += deadPlayer.vx;
                 deadPlayer.y += deadPlayer.vy;
-                deadPlayer.vy += 0.5;
+                deadPlayer.vy += 1;
                 deadPlayer.rotation += 0.12;
-                if (deadPlayer.y + cameraY > canvas.height + 150) {
+                if (deadPlayer.y + cameraY > canvas.height + 300) {
                     showMenu();
                 }
             }
@@ -285,11 +295,12 @@
             gameState = "falling";
             bgMusicGame.pause();
             playSound(sndGameOver);
-            deadPlayer = { x: player.x, y: player.y, vx: (incomingBlock.side === 'left' ? 5 : -5), vy: -12, rotation: 0 };
+            deadPlayer = { x: player.x, y: player.y, vx: (incomingBlock.side === 'left' ? 10 : -10), vy: -24, rotation: 0 };
         }
 
         function showMenu() {
             gameState = "gameOver";
+            
             let savedCoins = parseInt(localStorage.getItem('gameCoins')) || 0;
             savedCoins += score; 
             localStorage.setItem('gameCoins', savedCoins);
@@ -303,7 +314,7 @@
         function draw() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // --- EL TRUCO ANTIBLUR: Desactiva el suavizado nativo en cada renderizado ---
+            // Forzar desactivación de suavizado nativo del Canvas 2D
             ctx.imageSmoothingEnabled = false;
             ctx.mozImageSmoothingEnabled = false;
             ctx.webkitImageSmoothingEnabled = false;
@@ -320,10 +331,10 @@
                 ctx.drawImage(incomingBlock.img, incomingBlock.x, incomingBlock.y, incomingBlock.w, incomingBlock.h);
                 
                 if (incomingBlock.powerUp) {
-                    let powerW = 40; // Íconos ligeramente más grandes también
-                    let powerH = 40;
+                    let powerW = 70; 
+                    let powerH = 70;
                     let powerX = incomingBlock.x + (incomingBlock.w / 2) - (powerW / 2);
-                    let powerY = incomingBlock.y - powerH - 5; 
+                    let powerY = incomingBlock.y - powerH - 10; 
 
                     if (incomingBlock.powerUp === 'shield') {
                         ctx.drawImage(imgShield, powerX, powerY, powerW, powerH);
@@ -336,16 +347,16 @@
 
                 if (activePowerUp === 'shield') {
                     ctx.strokeStyle = "rgba(52, 152, 219, 0.8)";
-                    ctx.lineWidth = 4;
-                    ctx.strokeRect(player.x - 5, player.y - 5, player.w + 10, player.h + 10);
+                    ctx.lineWidth = 6;
+                    ctx.strokeRect(player.x - 10, player.y - 10, player.w + 20, player.h + 20);
                 }
             }
 
             if (gameState === "falling") {
                 ctx.save();
-                ctx.translate(deadPlayer.x + (player.w / 2), deadPlayer.y + (player.h / 2));
+                ctx.translate(deadPlayer.x + 65, deadPlayer.y + 80); 
                 ctx.rotate(deadPlayer.rotation);
-                ctx.drawImage(imgPlayer, -(player.w / 2), -(player.h / 2), player.w, player.h);
+                ctx.drawImage(imgPlayer, -65, -80, 130, 160);
                 ctx.restore();
             }
 
@@ -357,7 +368,7 @@
         retryBtn.addEventListener('click', initGame);
         
         window.addEventListener('mousedown', () => {
-            startMusicGame(); 
+            startMusicGame();
             if (gameState === "playing" && player.onGround) {
                 player.dy = jumpForce;
                 player.onGround = false;
